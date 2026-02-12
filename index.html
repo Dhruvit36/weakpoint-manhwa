@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Image Sequence Viewer</title>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            font-family: system-ui, Segoe UI, Roboto, Arial;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 20px;
+            background: #f7f7f7;
+        }
+
+        .main {
+            max-width: 720px;
+            width: 100%;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+            padding: 16px;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .file-info {
+            text-align: center;
+            color: #555;
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+        }
+
+        #gallery img {
+            width: 100%;
+            height: auto;
+            display: block;
+            margin: 12px auto;
+            border-radius: 4px;
+        }
+
+        .choose-btn {
+            cursor: pointer;
+            display: inline-block;
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: #0078d4;
+            color: white;
+            font-weight: 600;
+        }
+
+        .choose-btn input {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main">
+        <div id="gallery"></div>
+    </div>
+
+    <script>
+        const gallery = document.getElementById('gallery');
+        const maxIndex = 954;
+
+        function clearGallery() { gallery.innerHTML = ''; }
+
+        // Relative folder path (relative to this HTML file)
+        const basePath = './images';
+
+        // Build a URL relative to this document and encode it
+        function fileUrl(path, filename) {
+            const raw = path.replace(/\\/g, '/') + '/' + filename;
+            const url = new URL(raw, location.href).href;
+            return encodeURI(url);
+        }
+
+        function pad(num, size) {
+            let s = String(num);
+            while (s.length < size) s = '0' + s;
+            return s;
+        }
+
+        // Try sequentially until many consecutive misses, attempting several filename formats per index.
+        async function loadSequentialImages() {
+            clearGallery();
+
+            for (let i = 0; i <= maxIndex; i++) {
+                const name = i < 100 ? `Weakness_${pad(i, 2)}.jpg` : `Weakness_${i}.jpg`;
+                const url = fileUrl(basePath, name);
+                const imgEl = document.createElement('img');
+                imgEl.src = url;
+                imgEl.alt = name;
+                imgEl.loading = 'lazy';
+                gallery.appendChild(imgEl);
+            }
+        }
+
+        // Start automatically
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSequentialImages();
+        });
+    </script>
+</body>
+
+</html>
