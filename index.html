@@ -107,9 +107,16 @@
             </select>
             <button class="nav-btn" id="nextChapter">Next →</button>
         </div>
-        <div class="file-info" id="fileInfo">Select a chapter to start reading</div>
+        <div class="file-info" id="fileInfo"></div>
         <div id="gallery"></div>
         <div class="loading" id="loading" style="display: none;">Loading images...</div>
+        <div class="controls" id="bottomControls" style="margin-top: 20px;">
+            <button class="nav-btn" id="prevChapterBottom">← Previous</button>
+            <select class="chapter-selector" id="chapterSelectorBottom">
+                <option value="">Select Chapter...</option>
+            </select>
+            <button class="nav-btn" id="nextChapterBottom">Next →</button>
+        </div>
     </div>
 
     <script>
@@ -118,6 +125,10 @@
         const loading = document.getElementById('loading');
         const prevBtn = document.getElementById('prevChapter');
         const nextBtn = document.getElementById('nextChapter');
+        // Bottom controls
+        const chapterSelectorBottom = document.getElementById('chapterSelectorBottom');
+        const prevBtnBottom = document.getElementById('prevChapterBottom');
+        const nextBtnBottom = document.getElementById('nextChapterBottom');
         
         let currentChapter = null;
         let availableChapters = [];
@@ -140,6 +151,12 @@
                 option.value = chapter;
                 option.textContent = `Chapter ${chapter}`;
                 chapterSelector.appendChild(option);
+                
+                // Also populate bottom selector
+                const optionBottom = document.createElement('option');
+                optionBottom.value = chapter;
+                optionBottom.textContent = `Chapter ${chapter}`;
+                chapterSelectorBottom.appendChild(optionBottom);
             });
         }
         
@@ -153,8 +170,16 @@
         
         function updateNavigationButtons() {
             const currentIndex = availableChapters.indexOf(currentChapter);
-            prevBtn.disabled = currentIndex <= 0;
-            nextBtn.disabled = currentIndex >= availableChapters.length - 1;
+            const isFirst = currentIndex <= 0;
+            const isLast = currentIndex >= availableChapters.length - 1;
+            
+            // Update top controls
+            prevBtn.disabled = isFirst;
+            nextBtn.disabled = isLast;
+            
+            // Update bottom controls
+            prevBtnBottom.disabled = isFirst;
+            nextBtnBottom.disabled = isLast;
         }
         
         // Build a URL relative to this document for chapter images
@@ -329,13 +354,33 @@
             showLoading(false);
         }
         
-        // Event listeners
+        function syncChapterSelectors(selectedChapter) {
+            chapterSelector.value = selectedChapter;
+            chapterSelectorBottom.value = selectedChapter;
+        }
+        
+        function navigateToChapter(chapter) {
+            currentChapter = chapter;
+            syncChapterSelectors(chapter);
+            loadChapterImages(chapter);
+            updateNavigationButtons();
+            // Scroll to top when new chapter is loaded
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        // Event listeners for top controls
         chapterSelector.addEventListener('change', (e) => {
             const selectedChapter = parseInt(e.target.value);
             if (selectedChapter) {
-                currentChapter = selectedChapter;
-                loadChapterImages(selectedChapter);
-                updateNavigationButtons();
+                navigateToChapter(selectedChapter);
+            }
+        });
+        
+        // Event listeners for bottom controls
+        chapterSelectorBottom.addEventListener('change', (e) => {
+            const selectedChapter = parseInt(e.target.value);
+            if (selectedChapter) {
+                navigateToChapter(selectedChapter);
             }
         });
         
@@ -343,10 +388,15 @@
             const currentIndex = availableChapters.indexOf(currentChapter);
             if (currentIndex > 0) {
                 const prevChapter = availableChapters[currentIndex - 1];
-                currentChapter = prevChapter;
-                chapterSelector.value = prevChapter;
-                loadChapterImages(prevChapter);
-                updateNavigationButtons();
+                navigateToChapter(prevChapter);
+            }
+        });
+        
+        prevBtnBottom.addEventListener('click', () => {
+            const currentIndex = availableChapters.indexOf(currentChapter);
+            if (currentIndex > 0) {
+                const prevChapter = availableChapters[currentIndex - 1];
+                navigateToChapter(prevChapter);
             }
         });
         
@@ -354,10 +404,15 @@
             const currentIndex = availableChapters.indexOf(currentChapter);
             if (currentIndex < availableChapters.length - 1) {
                 const nextChapter = availableChapters[currentIndex + 1];
-                currentChapter = nextChapter;
-                chapterSelector.value = nextChapter;
-                loadChapterImages(nextChapter);
-                updateNavigationButtons();
+                navigateToChapter(nextChapter);
+            }
+        });
+        
+        nextBtnBottom.addEventListener('click', () => {
+            const currentIndex = availableChapters.indexOf(currentChapter);
+            if (currentIndex < availableChapters.length - 1) {
+                const nextChapter = availableChapters[currentIndex + 1];
+                navigateToChapter(nextChapter);
             }
         });
         
