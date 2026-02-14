@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Image Sequence Viewer</title>
+    <title>Weakpoint Manhwa Reader</title>
     <style>
         html,
         body {
@@ -50,67 +50,330 @@
             border-radius: 4px;
         }
 
-        .choose-btn {
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .chapter-selector {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: white;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .nav-btn {
             cursor: pointer;
             display: inline-block;
-            padding: 8px 12px;
+            padding: 8px 16px;
             border-radius: 6px;
             background: #0078d4;
             color: white;
             font-weight: 600;
+            border: none;
+            font-size: 0.9rem;
+            transition: background 0.2s;
         }
 
-        .choose-btn input {
-            display: none;
+        .nav-btn:hover {
+            background: #106ebe;
+        }
+
+        .nav-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            margin: 20px 0;
         }
     </style>
 </head>
 
 <body>
     <div class="main">
+        <div class="controls">
+            <button class="nav-btn" id="prevChapter">← Previous</button>
+            <select class="chapter-selector" id="chapterSelector">
+                <option value="">Select Chapter...</option>
+            </select>
+            <button class="nav-btn" id="nextChapter">Next →</button>
+        </div>
+        <div class="file-info" id="fileInfo">Select a chapter to start reading</div>
         <div id="gallery"></div>
+        <div class="loading" id="loading" style="display: none;">Loading images...</div>
     </div>
 
     <script>
         const gallery = document.getElementById('gallery');
-        const maxIndex = 954;
-
-        function clearGallery() { gallery.innerHTML = ''; }
-
-        // Relative folder path (relative to this HTML file)
-        const basePath = './images';
-
-        // Build a URL relative to this document and encode it
-        function fileUrl(path, filename) {
-            const raw = path.replace(/\\/g, '/') + '/' + filename;
-            const url = new URL(raw, location.href).href;
-            return encodeURI(url);
+        const chapterSelector = document.getElementById('chapterSelector');
+        const loading = document.getElementById('loading');
+        const prevBtn = document.getElementById('prevChapter');
+        const nextBtn = document.getElementById('nextChapter');
+        
+        let currentChapter = null;
+        let availableChapters = [];
+        
+        // Generate list of available chapters (1-120)
+        function generateChapters() {
+            const chapters = [];
+            for (let i = 1; i <= 120; i++) {
+                chapters.push(i);
+            }
+            return chapters;
         }
-
+        
+        // Populate chapter selector
+        function populateChapterSelector() {
+            availableChapters = generateChapters();
+            
+            availableChapters.forEach(chapter => {
+                const option = document.createElement('option');
+                option.value = chapter;
+                option.textContent = `Chapter ${chapter}`;
+                chapterSelector.appendChild(option);
+            });
+        }
+        
+        function clearGallery() { 
+            gallery.innerHTML = ''; 
+        }
+        
+        function showLoading(show = true) {
+            loading.style.display = show ? 'block' : 'none';
+        }
+        
+        function updateNavigationButtons() {
+            const currentIndex = availableChapters.indexOf(currentChapter);
+            prevBtn.disabled = currentIndex <= 0;
+            nextBtn.disabled = currentIndex >= availableChapters.length - 1;
+        }
+        
+        // Build a URL relative to this document for chapter images
+        function getChapterImageUrl(chapter, filename) {
+            // Properly encode the path components
+            const encodedChapter = encodeURIComponent(`Chapter ${chapter}`);
+            const encodedFilename = encodeURIComponent(filename);
+            const chapterPath = `./images/${encodedChapter}/${encodedFilename}`;
+            const url = new URL(chapterPath, location.href).href;
+            return url;
+        }
+        
         function pad(num, size) {
             let s = String(num);
             while (s.length < size) s = '0' + s;
             return s;
         }
-
-        // Try sequentially until many consecutive misses, attempting several filename formats per index.
-        async function loadSequentialImages() {
+        
+        // Hardcoded mapping of chapter image ranges - VERIFIED against all folders
+        const chapterMappings = {
+            1: { start: 0, end: 32 },
+            2: { start: 33, end: 64 },
+            3: { start: 65, end: 95 },
+            4: { start: 96, end: 127 },
+            5: { start: 128, end: 151 },
+            6: { start: 152, end: 172 },
+            7: { start: 173, end: 192 },
+            8: { start: 193, end: 211 },
+            9: { start: 212, end: 229 },
+            10: { start: 230, end: 248 },
+            11: { start: 249, end: 265 },
+            12: { start: 266, end: 284 },
+            13: { start: 285, end: 303 },
+            14: { start: 304, end: 323 },
+            15: { start: 324, end: 341 },
+            16: { start: 342, end: 360 },
+            17: { start: 361, end: 378 },
+            18: { start: 379, end: 395 },
+            19: { start: 396, end: 414 },
+            20: { start: 415, end: 431 },
+            21: { start: 432, end: 449 },
+            22: { start: 450, end: 467 },
+            23: { start: 468, end: 484 },
+            24: { start: 485, end: 501 },
+            25: { start: 502, end: 517 },
+            26: { start: 518, end: 535 },
+            27: { start: 536, end: 553 },
+            28: { start: 554, end: 570 },
+            29: { start: 571, end: 589 },
+            30: { start: 590, end: 606 },
+            31: { start: 607, end: 625 },
+            32: { start: 626, end: 642 },
+            33: { start: 643, end: 658 },
+            34: { start: 659, end: 675 },
+            35: { start: 676, end: 691 },
+            36: { start: 692, end: 709 },
+            37: { start: 710, end: 725 },
+            38: { start: 726, end: 742 },
+            39: { start: 743, end: 759 },
+            40: { start: 760, end: 776 },
+            41: { start: 777, end: 792 },
+            42: { start: 793, end: 809 },
+            43: { start: 810, end: 826 },
+            44: { start: 827, end: 843 },
+            45: { start: 844, end: 859 },
+            46: { start: 860, end: 876 },
+            47: { start: 877, end: 897 },
+            48: { start: 898, end: 916 },
+            49: { start: 917, end: 934 },
+            50: { start: 935, end: 954 },
+            51: { start: 0, end: 18 },
+            52: { start: 0, end: 17 },
+            53: { start: 0, end: 18 },
+            54: { start: 0, end: 16 },
+            55: { start: 0, end: 18 },
+            56: { start: 0, end: 17 },
+            57: { start: 0, end: 16 },
+            58: { start: 0, end: 17 },
+            59: { start: 0, end: 16 },
+            60: { start: 0, end: 15 },
+            61: { start: 0, end: 16 },
+            62: { start: 0, end: 19 },
+            63: { start: 0, end: 17 },
+            64: { start: 0, end: 15 },
+            65: { start: 0, end: 15 },
+            66: { start: 0, end: 19 },
+            67: { start: 0, end: 17 },
+            68: { start: 0, end: 19 },
+            69: { start: 0, end: 17 },
+            70: { start: 0, end: 18 },
+            71: { start: 0, end: 18 },
+            72: { start: 0, end: 18 },
+            73: { start: 0, end: 17 },
+            74: { start: 0, end: 18 },
+            75: { start: 0, end: 18 },
+            76: { start: 0, end: 20 },
+            77: { start: 0, end: 18 },
+            78: { start: 0, end: 20 },
+            79: { start: 0, end: 15 },
+            80: { start: 0, end: 20 },
+            81: { start: 0, end: 20 },
+            82: { start: 0, end: 19 },
+            83: { start: 0, end: 20 },
+            84: { start: 0, end: 20 },
+            85: { start: 0, end: 19 },
+            86: { start: 0, end: 19 },
+            87: { start: 0, end: 21 },
+            88: { start: 0, end: 20 },
+            89: { start: 0, end: 17 },
+            90: { start: 0, end: 17 },
+            91: { start: 0, end: 19 },
+            92: { start: 0, end: 19 },
+            93: { start: 0, end: 18 },
+            94: { start: 0, end: 20 },
+            95: { start: 0, end: 19 },
+            96: { start: 0, end: 18 },
+            97: { start: 0, end: 17 },
+            98: { start: 0, end: 19 },
+            99: { start: 0, end: 16 },
+            100: { start: 0, end: 17 },
+            101: { start: 0, end: 17 },
+            102: { start: 0, end: 20 },
+            103: { start: 0, end: 18 },
+            104: { start: 0, end: 16 },
+            105: { start: 0, end: 16 },
+            106: { start: 0, end: 17 },
+            107: { start: 0, end: 17 },
+            108: { start: 0, end: 18 },
+            109: { start: 0, end: 18 },
+            110: { start: 0, end: 18 },
+            111: { start: 0, end: 15 },
+            112: { start: 0, end: 19 },
+            113: { start: 0, end: 17 },
+            114: { start: 0, end: 17 },
+            115: { start: 0, end: 18 },
+            116: { start: 0, end: 20 },
+            117: { start: 0, end: 18 },
+            118: { start: 0, end: 16 },
+            119: { start: 0, end: 16 },
+            120: { start: 0, end: 15 }
+        };
+        
+        // Load all images from a specific chapter using hardcoded mapping
+        function loadChapterImages(chapter) {
+            if (!chapter || !chapterMappings[chapter]) {
+                fileInfo.textContent = `Chapter ${chapter} - Not found`;
+                return;
+            }
+            
             clearGallery();
-
-            for (let i = 0; i <= maxIndex; i++) {
-                const name = i < 100 ? `Weakness_${pad(i, 2)}.jpg` : `Weakness_${i}.jpg`;
-                const url = fileUrl(basePath, name);
+            showLoading(true);
+            
+            const mapping = chapterMappings[chapter];
+            const loadedImages = [];
+            
+            // Generate all images based on the mapping
+            for (let i = mapping.start; i <= mapping.end; i++) {
+                const filename = `Weakness_${pad(i, 2)}.jpg`;
+                const url = getChapterImageUrl(chapter, filename);
+                loadedImages.push({ url, filename, index: i });
+            }
+            
+            // Create and append image elements
+            loadedImages.forEach(({ url, filename }) => {
                 const imgEl = document.createElement('img');
                 imgEl.src = url;
-                imgEl.alt = name;
+                imgEl.alt = `Chapter ${chapter} - ${filename}`;
                 imgEl.loading = 'lazy';
                 gallery.appendChild(imgEl);
-            }
+            });
+            
+            showLoading(false);
         }
-
-        // Start automatically
+        
+        // Event listeners
+        chapterSelector.addEventListener('change', (e) => {
+            const selectedChapter = parseInt(e.target.value);
+            if (selectedChapter) {
+                currentChapter = selectedChapter;
+                loadChapterImages(selectedChapter);
+                updateNavigationButtons();
+            }
+        });
+        
+        prevBtn.addEventListener('click', () => {
+            const currentIndex = availableChapters.indexOf(currentChapter);
+            if (currentIndex > 0) {
+                const prevChapter = availableChapters[currentIndex - 1];
+                currentChapter = prevChapter;
+                chapterSelector.value = prevChapter;
+                loadChapterImages(prevChapter);
+                updateNavigationButtons();
+            }
+        });
+        
+        nextBtn.addEventListener('click', () => {
+            const currentIndex = availableChapters.indexOf(currentChapter);
+            if (currentIndex < availableChapters.length - 1) {
+                const nextChapter = availableChapters[currentIndex + 1];
+                currentChapter = nextChapter;
+                chapterSelector.value = nextChapter;
+                loadChapterImages(nextChapter);
+                updateNavigationButtons();
+            }
+        });
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' && !prevBtn.disabled) {
+                prevBtn.click();
+            } else if (e.key === 'ArrowRight' && !nextBtn.disabled) {
+                nextBtn.click();
+            }
+        });
+        
+        // Initialize on page load
         window.addEventListener('DOMContentLoaded', () => {
-            loadSequentialImages();
+            populateChapterSelector();
+            updateNavigationButtons();
         });
     </script>
 </body>
